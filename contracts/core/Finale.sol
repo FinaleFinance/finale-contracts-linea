@@ -36,12 +36,18 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     address public _horizonrouterAddress = 0x272E156Df8DA513C69cB41cC7A99185D53F926Bb;
     IEchoRouter echoRouter;
     address public _echoRouterAddress = 0xc66149996d0263C0B42D3bC05e50Db88658106cE;
+    IEchoRouter leetswapRouter;
+    address public _leetswapRouterAddress = 0x169C06b4cfB09bFD73A81e6f2Bb1eB514D75bB19;
     address public _fee_address = 0xCA11332523f17A524b71990AEc94113f8ABe07cB;
+    IWETH public weth;
+    address public _wethAddress = 0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f;
 
     constructor() ReentrancyGuard() Ownable(msg.sender) {
         syncRouter = ISyncRouter(_syncrouterAddress);
         horizonRouter = IHorizonRouter(_horizonrouterAddress);
         echoRouter = IEchoRouter(_echoRouterAddress);
+        leetswapRouter = IEchoRouter(_leetswapRouterAddress);
+        weth = IWETH(_wethAddress);
     }
 
     /**
@@ -52,8 +58,10 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     function maxApprovals(address[] calldata tokens) external onlyOwner {
         for(uint i = 0; i < tokens.length; i++) {
             IERC20 token = IERC20(tokens[i]);
+            if(!token.approve(_syncrouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], _syncrouterAddress);
             if(!token.approve(_horizonrouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], _horizonrouterAddress);
             if(!token.approve(_echoRouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], _echoRouterAddress);
+            if(!token.approve(_leetswapRouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], _leetswapRouterAddress);
         }
     }
 
@@ -65,8 +73,10 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     function revokeApprovals(address[] calldata tokens) external onlyOwner {
         for(uint i = 0; i < tokens.length; i++) {
             IERC20 token = IERC20(tokens[i]);
+            if(!token.approve(_syncrouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _syncrouterAddress);
             if(!token.approve(_horizonrouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _horizonrouterAddress);
             if(!token.approve(_echoRouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _echoRouterAddress);
+            if(!token.approve(_leetswapRouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _leetswapRouterAddress);
         }
     }
 
@@ -104,6 +114,7 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, amounts, 2);
         return tokenOutAmount;
     }
+
     /**
      * @notice Executes a token swap on a specific pool using SyncSwap.
      * @dev This function is internal, meaning it can only be called by this contract.
@@ -176,16 +187,55 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     }
 
     /**
+     * @notice Executes a token swap using the specified tokenIn, tokenOut, amountIn, and amountOutMin.
+     * @dev Internal function used by executeSwaps.
+     * @param tokenIn Address of the input token.
+     * @param tokenOut Address of the output token.
+     * @param amountIn Amount of input token to swap.
+     * @return A struct containing the address of the output token and the amount of output tokens received.
+     */
+    function leetSwap(
+        address tokenIn,
+        address tokenOut,
+        uint amountIn
+    ) internal returns (IPool.TokenAmount memory) {
+        address[] memory path = new address[](2);
+        path[0] = tokenIn;
+        path[1] = tokenOut;
+        uint deadline = block.timestamp + 20 minutes; 
+        uint[] memory amounts = leetswapRouter.swapExactTokensForTokens(
+            amountIn,
+            0,
+            path,
+            address(this),
+            deadline
+        );
+
+        IPool.TokenAmount memory tokenOutAmount;
+        tokenOutAmount.token = tokenOut;
+        tokenOutAmount.amount = amounts[amounts.length - 1];
+        emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, amounts[amounts.length - 1], 3);
+        return tokenOutAmount;
+    }
+
+    /**
      * @notice Executes a series of swap operations based on the provided swapParams.
      * @dev This function performs chained swaps using syncswap, horizondex and echodex functions.
      * @param swapParams Array of SwapParam structures containing swap details.
      * @param minTotalAmountOut Minimum total amount of output token expected.
      */
-    function executeSwaps(Params.SwapParam[] memory swapParams, uint minTotalAmountOut) nonReentrant() external {
+    function executeSwaps(Params.SwapParam[] memory swapParams, uint minTotalAmountOut) payable nonReentrant() external {
         address tokenG = swapParams[0].tokenIn;
         IERC20 token = IERC20(tokenG);
         uint256 amountIn = swapParams[0].amountIn;
-        if (!token.transferFrom(msg.sender ,address(this), amountIn)) revert TransferFromFailedError(msg.sender, address(this), amountIn);
+
+        if(msg.value > 0) {
+            weth.deposit{value: msg.value}();
+            amountIn = msg.value;
+        } else {
+            if (!token.transferFrom(msg.sender, address(this), amountIn)) revert TransferFromFailedError(msg.sender, address(this), amountIn);
+        }
+
         address finalTokenAddress;
         uint finalTokenAmount;
         for(uint i = 0; i < swapParams.length; i++) {
@@ -215,7 +265,16 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
                 );
                 finalTokenAddress = result.token;
                 finalTokenAmount = result.amount;
-            } else {
+            } else if(param.swapType == 4) {
+                IPool.TokenAmount memory result = leetSwap(
+                    param.tokenIn, 
+                    param.tokenOut, 
+                    amountIn
+                );
+                finalTokenAddress = result.token;
+                finalTokenAmount = result.amount;
+            }
+            else {
                 revert("Invalid swap type");
             }
             amountIn = finalTokenAmount;
