@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "../utils/ReentrancyGuard.sol";
 import "../interfaces/Interfaces.sol";
 import "./ContractErrors.sol";
 import "../utils/Ownable.sol";
 import "../utils/Math.sol";
+import "hardhat/console.sol";
 
 /**
  * @title Finale Contract
@@ -29,14 +30,14 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         uint minTotalAmountOut,
         uint finalTokenAmount
     );
-
+    
     ISyncRouter syncRouter;
-    address public _syncrouterAddress = 0xB3b7fCbb8Db37bC6f572634299A58f51622A847e;
+    address public _syncrouterAddress = 0x80e38291e06339d10AAB483C65695D004dBD5C69;
     IHorizonRouter horizonRouter;
     address public _horizonrouterAddress = 0x272E156Df8DA513C69cB41cC7A99185D53F926Bb;
     IEchoRouter echoRouter;
     address public _echoRouterAddress = 0xc66149996d0263C0B42D3bC05e50Db88658106cE;
-    IEchoRouter leetswapRouter;
+    ILeetswapRouter leetswapRouter;
     address public _leetswapRouterAddress = 0x169C06b4cfB09bFD73A81e6f2Bb1eB514D75bB19;
     address public _fee_address = 0xCA11332523f17A524b71990AEc94113f8ABe07cB;
     IWETH public weth;
@@ -46,7 +47,7 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         syncRouter = ISyncRouter(_syncrouterAddress);
         horizonRouter = IHorizonRouter(_horizonrouterAddress);
         echoRouter = IEchoRouter(_echoRouterAddress);
-        leetswapRouter = IEchoRouter(_leetswapRouterAddress);
+        leetswapRouter = ILeetswapRouter(_leetswapRouterAddress);
         weth = IWETH(_wethAddress);
     }
 
@@ -210,11 +211,10 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
             address(this),
             deadline
         );
-
         IPool.TokenAmount memory tokenOutAmount;
         tokenOutAmount.token = tokenOut;
         tokenOutAmount.amount = amounts[amounts.length - 1];
-        emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, amounts[amounts.length - 1], 3);
+        emit SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, amounts[amounts.length - 1], 4);
         return tokenOutAmount;
     }
 
@@ -235,7 +235,6 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         } else {
             if (!token.transferFrom(msg.sender, address(this), amountIn)) revert TransferFromFailedError(msg.sender, address(this), amountIn);
         }
-
         address finalTokenAddress;
         uint finalTokenAmount;
         for(uint i = 0; i < swapParams.length; i++) {
