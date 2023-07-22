@@ -31,24 +31,24 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     );
     
     ISyncRouter syncRouter;
-    address public _syncrouterAddress = 0x80e38291e06339d10AAB483C65695D004dBD5C69;
+    address public syncrouterAddress = 0x80e38291e06339d10AAB483C65695D004dBD5C69;
     IHorizonRouter horizonRouter;
-    address public _horizonrouterAddress = 0x272E156Df8DA513C69cB41cC7A99185D53F926Bb;
+    address public horizonrouterAddress = 0x272E156Df8DA513C69cB41cC7A99185D53F926Bb;
     IEchoRouter echoRouter;
-    address public _echoRouterAddress = 0xc66149996d0263C0B42D3bC05e50Db88658106cE;
+    address public echoRouterAddress = 0xc66149996d0263C0B42D3bC05e50Db88658106cE;
     ILeetswapRouter leetswapRouter;
-    address public _leetswapRouterAddress = 0x169C06b4cfB09bFD73A81e6f2Bb1eB514D75bB19;
-    address public _fee_address = 0xCA11332523f17A524b71990AEc94113f8ABe07cB;
+    address public leetswapRouterAddress = 0x169C06b4cfB09bFD73A81e6f2Bb1eB514D75bB19;
+    address public fee_address = 0xCA11332523f17A524b71990AEc94113f8ABe07cB;
     IWETH public weth;
-    address public _wethAddress = 0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f;
+    address public wethAddress = 0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f;
     uint public feePercentage = 3;
     
     constructor() ReentrancyGuard() Ownable(msg.sender) {
-        syncRouter = ISyncRouter(_syncrouterAddress);
-        horizonRouter = IHorizonRouter(_horizonrouterAddress);
-        echoRouter = IEchoRouter(_echoRouterAddress);
-        leetswapRouter = ILeetswapRouter(_leetswapRouterAddress);
-        weth = IWETH(_wethAddress);
+        syncRouter = ISyncRouter(syncrouterAddress);
+        horizonRouter = IHorizonRouter(horizonrouterAddress);
+        echoRouter = IEchoRouter(echoRouterAddress);
+        leetswapRouter = ILeetswapRouter(leetswapRouterAddress);
+        weth = IWETH(wethAddress);
     }
 
     /**
@@ -59,10 +59,10 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     function maxApprovals(address[] calldata tokens) external onlyOwner {
         for(uint i = 0; i < tokens.length; i++) {
             IERC20 token = IERC20(tokens[i]);
-            if(!token.approve(_syncrouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], _syncrouterAddress);
-            if(!token.approve(_horizonrouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], _horizonrouterAddress);
-            if(!token.approve(_echoRouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], _echoRouterAddress);
-            if(!token.approve(_leetswapRouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], _leetswapRouterAddress);
+            if(!token.approve(syncrouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], syncrouterAddress);
+            if(!token.approve(horizonrouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], horizonrouterAddress);
+            if(!token.approve(echoRouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], echoRouterAddress);
+            if(!token.approve(leetswapRouterAddress, type(uint256).max)) revert ApprovalFailedError(tokens[i], leetswapRouterAddress);
         }
     }
 
@@ -74,10 +74,10 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     function revokeApprovals(address[] calldata tokens) external onlyOwner {
         for(uint i = 0; i < tokens.length; i++) {
             IERC20 token = IERC20(tokens[i]);
-            if(!token.approve(_syncrouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _syncrouterAddress);
-            if(!token.approve(_horizonrouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _horizonrouterAddress);
-            if(!token.approve(_echoRouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _echoRouterAddress);
-            if(!token.approve(_leetswapRouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _leetswapRouterAddress);
+            if(!token.approve(syncrouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], syncrouterAddress);
+            if(!token.approve(horizonrouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], horizonrouterAddress);
+            if(!token.approve(echoRouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], echoRouterAddress);
+            if(!token.approve(leetswapRouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], leetswapRouterAddress);
         }
     }
 
@@ -88,6 +88,16 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
      */
     function setFeePercentage(uint _feePercentage) external onlyOwner {
         feePercentage = _feePercentage;
+    }
+
+    /**
+     * @notice Sets the new fee address where fees will be sent to.
+     * @dev Only the contract owner can call this function.
+     * @param _newFeeAddress The new fee address to be set.
+     */
+    function setFeeAddress(address _newFeeAddress) external onlyOwner {
+        require(_newFeeAddress != address(0), "Invalid address");
+        fee_address = _newFeeAddress;
     }
 
     /**
@@ -291,7 +301,7 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         IERC20 finalToken = IERC20(finalTokenAddress);
         uint fee = finalTokenAmount * feePercentage / 1000;
         uint amountToTransfer = finalTokenAmount - fee;
-        if(!finalToken.transfer(_fee_address, fee)) revert TransferFailedError(finalTokenAddress, _fee_address, fee);
+        if(!finalToken.transfer(fee_address, fee)) revert TransferFailedError(finalTokenAddress, fee_address, fee);
         if(!finalToken.transfer(msg.sender, amountToTransfer)) revert TransferFailedError(finalTokenAddress, msg.sender, amountToTransfer);
     
         emit PathsExecuted(msg.sender, swapParams, minTotalAmountOut, finalTokenAmount);
