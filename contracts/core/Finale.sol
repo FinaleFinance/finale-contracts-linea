@@ -6,7 +6,6 @@ import "../interfaces/Interfaces.sol";
 import "./ContractErrors.sol";
 import "../utils/Ownable.sol";
 import "../utils/Math.sol";
-import "hardhat/console.sol";
 
 /**
  * @title Finale Contract
@@ -42,7 +41,8 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     address public _fee_address = 0xCA11332523f17A524b71990AEc94113f8ABe07cB;
     IWETH public weth;
     address public _wethAddress = 0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f;
-
+    uint public feePercentage = 3;
+    
     constructor() ReentrancyGuard() Ownable(msg.sender) {
         syncRouter = ISyncRouter(_syncrouterAddress);
         horizonRouter = IHorizonRouter(_horizonrouterAddress);
@@ -79,6 +79,10 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
             if(!token.approve(_echoRouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _echoRouterAddress);
             if(!token.approve(_leetswapRouterAddress, 0)) revert RevokeApprovalFailedError(tokens[i], _leetswapRouterAddress);
         }
+    }
+
+    function setFeePercentage(uint _feePercentage) external onlyOwner {
+        feePercentage = _feePercentage;
     }
 
     /**
@@ -280,7 +284,7 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         }
         if(finalTokenAmount < minTotalAmountOut) revert AmountLessThanMinRequiredError(finalTokenAmount, minTotalAmountOut);
         IERC20 finalToken = IERC20(finalTokenAddress);
-        uint fee = (finalTokenAmount * 3) / 1000;
+        uint fee = finalTokenAmount * feePercentage / 1000;
         uint amountToTransfer = finalTokenAmount - fee;
         if(!finalToken.transfer(_fee_address, fee)) revert TransferFailedError(finalTokenAddress, _fee_address, fee);
         if(!finalToken.transfer(msg.sender, amountToTransfer)) revert TransferFailedError(finalTokenAddress, msg.sender, amountToTransfer);
