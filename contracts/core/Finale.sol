@@ -81,6 +81,11 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         }
     }
 
+    /**
+     * @notice Sets the fee percentage for a particular operation.
+     * @dev Only the contract owner can call this function.
+     * @param _feePercentage The new fee percentage to be set.
+     */
     function setFeePercentage(uint _feePercentage) external onlyOwner {
         feePercentage = _feePercentage;
     }
