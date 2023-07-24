@@ -243,7 +243,7 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
      * @param swapParams Array of SwapParam structures containing swap details.
      * @param minTotalAmountOut Minimum total amount of output token expected.
      */
-    function executeSwaps(Params.SwapParam[] memory swapParams, uint minTotalAmountOut) payable nonReentrant() external {
+    function executeSwaps(Params.SwapParam[] memory swapParams, uint minTotalAmountOut) payable nonReentrant() external returns (uint) {
         address tokenG = swapParams[0].tokenIn;
         IERC20 token = IERC20(tokenG);
         uint256 amountIn = swapParams[0].amountIn;
@@ -305,5 +305,6 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         if(!finalToken.transfer(msg.sender, amountToTransfer)) revert TransferFailedError(finalTokenAddress, msg.sender, amountToTransfer);
     
         emit PathsExecuted(msg.sender, swapParams, minTotalAmountOut, finalTokenAmount);
+        return amountToTransfer;
     }
 }
