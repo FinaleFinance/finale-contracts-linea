@@ -243,11 +243,10 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
      * @param swapParams Array of SwapParam structures containing swap details.
      * @param minTotalAmountOut Minimum total amount of output token expected.
      */
-    function executeSwaps(Params.SwapParam[] memory swapParams, uint minTotalAmountOut) payable nonReentrant() external returns (uint) {
+    function executeSwaps(Params.SwapParam[] memory swapParams, uint minTotalAmountOut, bool conveth) payable nonReentrant() external returns (uint) {
         address tokenG = swapParams[0].tokenIn;
         IERC20 token = IERC20(tokenG);
         uint256 amountIn = swapParams[0].amountIn;
-
         if(msg.value > 0) {
             weth.deposit{value: msg.value}();
             amountIn = msg.value;
@@ -302,9 +301,20 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
         uint fee = finalTokenAmount * feePercentage / 1000;
         uint amountToTransfer = finalTokenAmount - fee;
         if(!finalToken.transfer(fee_address, fee)) revert TransferFailedError(finalTokenAddress, fee_address, fee);
-        if(!finalToken.transfer(msg.sender, amountToTransfer)) revert TransferFailedError(finalTokenAddress, msg.sender, amountToTransfer);
-    
-        emit PathsExecuted(msg.sender, swapParams, minTotalAmountOut, finalTokenAmount);
-        return amountToTransfer;
+        if (conveth && finalTokenAddress == wethAddress) {
+            weth.withdraw(amountToTransfer);
+            (bool success, ) = msg.sender.call{value: amountToTransfer}("");
+            if (!success) {
+                revert TransferFailedError(address(0), msg.sender, amountToTransfer);
+            }
+            emit PathsExecuted(msg.sender, swapParams, minTotalAmountOut, finalTokenAmount);
+            return amountToTransfer;
+        } else {
+            if (!finalToken.transfer(msg.sender, amountToTransfer)) {
+                revert TransferFailedError(finalTokenAddress, msg.sender, amountToTransfer);
+            }
+            emit PathsExecuted(msg.sender, swapParams, minTotalAmountOut, finalTokenAmount);
+            return amountToTransfer;
+        }
     }
 }
