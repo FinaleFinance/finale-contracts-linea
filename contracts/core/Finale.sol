@@ -101,6 +101,35 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
     }
 
     /**
+     * @notice Withdraws a specific ERC20 token from the contract to the specified address.
+     * @dev Only the contract owner can call this function.
+     * @param _token The address of the ERC20 token to be withdrawn.
+     * @param _to The address that will receive the tokens.
+     */
+    function withdrawTokens(address _token, address _to) external onlyOwner {
+        require(_to != address(0), "Invalid address");
+        
+        IERC20 token = IERC20(_token);
+        uint256 balance = token.balanceOf(address(this));
+        
+        require(token.transfer(_to, balance), "Transfer failed");
+    }
+
+    /**
+     * @notice Withdraws the entire Ether balance from the contract to the specified address.
+     * @dev Only the contract owner can call this function.
+     * @param _to The address that will receive the Ether.
+     */
+    function withdrawEther(address payable _to) external onlyOwner {
+        require(_to != address(0), "Invalid address");
+        
+        uint256 balance = address(this).balance;
+        
+        (bool success, ) = _to.call{value: balance}("");
+        require(success, "Transfer failed");
+    }
+
+    /**
      * @notice Executes a token swap on HorizonDex.
      * @dev This function is internal, meaning it can only be called by this contract.
      * @param tokenIn The address of the input token for the swap.
@@ -317,4 +346,5 @@ contract Finale is ReentrancyGuard, ContractErrors, Ownable {
             return amountToTransfer;
         }
     }
+    receive() external payable {}
 }
